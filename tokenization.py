@@ -2,178 +2,178 @@
 import keyword
 import string
 
-# Initialize the variables to count the number of keywords, identifiers, literals, operators, separators, and comments
-kCount = 0
-kList = []
-iCount = 0
-iList = []
-lCount = 0
-lList = []
-oCount = 0
-oList = []
-sCount = 0
-sList = []
-cCount = 0
-cList = []
-# String to check if keyword or identifier
-koriString = ''
-# String to store string literals
-stringLiteral = ''
-# Initialize the variables to check if we are locked in a literal or comment
-literalLocked = False
-commentLocked = False
-# Initializing first quote character and first comment character to 'i' to indicate that we are not locked in a literal or comment
-firstQuoteChar = 'i'
-firstCommentChar = 'i'
-# Initialize the variable that indicates that the first character of the line is a comment character
-commentLockedFirstChar = False
-# Initialize the variables to keep track of the previous space and next space index
-prevspaceIndex = -1
-nextspaceIndex = 0
-# Initialize the variables to keep track of the previous quote and next quote index
-prevquoteIndex = 0
-nextquoteIndex = 0
-# Initialize the variable to keep track of the next parantheses index
-nextparanthesesIndex = 0
-# Initialize the variable to keep track of whether we have reached a character in the line
-charReached = False
-# Initialize the string which prints out the code with excess spaces and comments removed
-excessRemoved = ''
-# Initialize the variable to check if we need to remove the repeated space after a space
-removeSpace = False
+# Store a list of python operators
+operators = [
+    "+", "-", "*", "/", "%", "**", "//",   # Arithmetic Operators
+    "=", "+=", "-=", "*=", "/=", "%=", "//=", "**=", "&=", "|=", "^=", ">>=", "<<=",  # Assignment Operators
+    "==", "!=", ">", "<", ">=", "<=",   # Comparison Operators
+    "&", "|", "^", "~", "<<", ">>"   # Bitwise Operators
+]
 
-# Function to check if a string is a number: https://stackoverflow.com/questions/40097590/detect-whether-a-python-string-is-a-number-or-a-letter
-def is_number(n):
-    try:
-        float(n)
-    except ValueError:
-        return False
-    return True
+class CodeParser:
+    def __init__(self, filepath):
+        self.filepath = filepath
+        # Initialize the class with the filepath and counters for tokens
+        self.kCount, self.iCount, self.lCount, self.oCount, self.sCount, self.cCount = 0, 0, 0, 0, 0, 0
+        self.kList, self.iList, self.lList, self.oList, self.sList, self.cList = [], [], [], [], [], []
+        # Final output string
+        self.excessRemoved = ''
+        # Literal/Comment lock, first char comment, valid char reached, repeated space detected
+        self.literalLocked, self.commentLocked, self.commentLockedFirstChar, self.charReached, self.removeSpace = False, False, False, False, False
+        # Initializing first quote character and first comment character to 'i' to indicate that we are not locked in a literal or comment
+        self.firstQuoteChar, self.firstCommentChar = 'i', 'i'
+        # Index trackers
+        self.prevspaceIndex, self.firstCommentCharIndex, self.nextspaceIndex, self.prevquoteIndex, self.nextquoteIndex, self.nextpunctIndex = 0, 0, 0, 0, 0, 0
 
-# Open the file and read the lines
-with open("test.py", "r") as file:
-    for line in file:
-        # Ensure that charReached and commentLockedFirstChar are set to False at the beginning of each line
-        charReached = False
-        commentLockedFirstChar = False
+    def parse_file(self):
+        # Open the file and read the lines
+        with open(self.filepath, "r") as file:
+            for line in file:
+                self.prevspaceIndex = 0
+                self.nextspaceIndex = 0
+                self.charReached = False
+                self.commentLockedFirstChar = False
+                self.parse_line(line)
+        self.print_results()
+    
+    def parse_line(self, line):
         for i, char in enumerate(line):
             # Ensure that removeSpace is set to False at the beginning of each character
-            removeSpace = False
-            # Check if we are not in a literal or comment
-            if literalLocked == False and commentLocked == False:
-                if not charReached and (char != ' ' and char != '\n' and char != '#'):
-                    charReached = True
-                # Check if we have reached a comment character. If we have, set commentLocked to True and increment the comment count
-                if (char == '#' and firstCommentChar == 'i'):
-                    commentLocked = True
-                    # If comment is the first character of the line, we will not output the newline. <- This logic is seen later
-                    if i == 0:
-                        commentLockedFirstChar = True
-                    firstCommentChar = char
-                    cCount += 1
-                    if char not in cList:
-                        cList.append(char)
-                # Check if we have reached an operator.
-                elif (  char == '+' or char == '-' or char == '*' or char == '/' or char == '=' or
-                        char == '<' or char == '>' or char == '%' or char == '&' or char == '|' or
-                        char == '^' or char == '~' or char == '!' or char == '?' or char == '@' or
-                        char == '#' or char == '$' or char == '`' or char == '++' or char == '--' or
-                        char == '==' or char == '!=' or char == '<=' or char == '>=' or char == '<<' or
-                        char == '>>' or char == '&&' or char == '||' or char == '+=' or char == '-=' or
-                        char == '*=' or char == '/=' or char == '%=' or char == '&=' or char == '|=' or
-                        char == '^=' or char == '>>=' or char == '<<=' or char == '>>>' or char == '>>>=' or
-                        char == '->' or char == '=>'):
-                    oCount += 1
-                    if char not in oList:
-                        oList.append(char)
-                # Check if we have reached a separator
-                elif (char in string.punctuation and char != '"' and char != "'"):
-                    sCount += 1
-                    if char not in sList:
-                        sList.append(char)
-                    # Check if there is a keyword or identifier before the parantheses for a function call
-                    if (char == '('):
-                        nextparanthesesIndex = i
-                        for c in line[prevspaceIndex + 1:nextparanthesesIndex]:
-                            koriString = koriString + c
-                        if keyword.iskeyword(koriString) or koriString == 'print':
-                            kCount += 1
-                            if koriString not in kList:
-                                kList.append(koriString)
-                        elif koriString.isidentifier():
-                            iCount += 1
-                            if koriString not in iList:
-                                iList.append(koriString)
-                        koriString = ''
-                # Utilize space to select words and determine if they are keywords or identifiers
-                elif (char == ' '):
-                    nextspaceIndex = i
-                    for c in line[prevspaceIndex + 1:nextspaceIndex]:
-                        koriString = koriString + c
-                    prevspaceIndex = nextspaceIndex
-                    if keyword.iskeyword(koriString) or koriString == 'print':
-                        kCount += 1
-                        if koriString not in kList:
-                            kList.append(koriString)
-                    elif koriString.isidentifier():
-                        iCount += 1
-                        if koriString not in iList:
-                            iList.append(koriString)
-                    koriString = ''
-                    # Check for repeated spaces and remove them
-                    if line[i - 1] == ' ':
-                        removeSpace = True
-                # Check if character is a number
-                elif (is_number(char)):
-                    lCount += 1
-                    if char not in lList:
-                        lList.append(char)
-            # Check if we are in a comment
-            elif literalLocked == False and commentLocked == True:
-                if (char == '\n'):
-                    # Begin resetting the variables for the next line
-                    commentLocked = False
-                    firstCommentChar = 'i'
-                    prevspaceIndex = -1
-                    # Logic referenced from earlier to remove the newline if the comment was the first character of the line
-                    if commentLockedFirstChar:
-                        charReached = False
-            # Check if we are in not in a comment and maybe a literal or not (Ambiguity necessary to account for first and second quotes)
-            if commentLocked == False:
-                if (char == '"' or char == "'"):
-                    if (firstQuoteChar == char):
-                        # Unlock us from the literal and store the string literal
-                        nextquoteIndex = i
-                        for c in line[prevquoteIndex:nextquoteIndex + 1]:
-                            stringLiteral = stringLiteral + c
-                        if stringLiteral not in lList:
-                            lList.append(stringLiteral)
-                        literalLocked = False
-                        firstQuoteChar = 'i'
-                    elif (firstQuoteChar == 'i'):
-                        # Lock us in a literal, log the first quote character, and increment the literal count
-                        prevquoteIndex = i
-                        literalLocked = True
-                        firstQuoteChar = char
-                        lCount += 1
-                # Add character to final output string
-                if charReached and not (i == 0 and char == '\n') and not removeSpace:
-                    excessRemoved = excessRemoved + char
+            self.removeSpace = False
+            self.handle_comments(char, i, line)
+            self.handle_operators(char)
+            self.handle_separators(char)
+            self.handle_keywords_identifiers(char, i, line)
+            self.handle_literals(char, i, line)
+            self.remove_excess(char, i)
+    
+    def handle_comments(self, char, i, line):
+        if self.literalLocked == False and self.commentLocked == False:    
+            if char == '#' and self.firstCommentChar == 'i':
+                self.commentLocked = True
+                # If comment is the first character of the line, we will not output the newline. <- This logic is seen later
+                if i == 0:
+                    self.commentLockedFirstChar = True
+                self.firstCommentChar = char
+                self.firstCommentCharIndex = i
+                self.cCount += 1
+        elif self.literalLocked == False and self.commentLocked == True:
+            if char == '\n':
+                # Begin resetting the variables for the next line
+                tempcString = ''
+                for c in line[self.firstCommentCharIndex:i]:
+                    tempcString = tempcString + c
+                if tempcString not in self.cList:
+                    self.cList.append(tempcString)
+                self.commentLocked = False
+                self.firstCommentChar = 'i'
+                self.prevspaceIndex = 0
+    
+    def handle_operators(self, char):
+        if self.literalLocked == False and self.commentLocked == False:     
+            if (char in operators):
+                self.oCount += 1
+                if char not in self.oList:
+                    self.oList.append(char)
 
-print("\n", excessRemoved)
-print("\nCOUNTS")
-print("Keywords: ", kCount)
-print("Identifiers: ", iCount)
-print("Literals: ", lCount)
-print("Operators: ", oCount)
-print("Separators: ", sCount)
-print("Comments: ", cCount)
-print("\nLISTS")
-print("Keywords: ", kList)
-print("Identifiers: ", iList)
-print("Literals: ", lList)
-print("Operators: ", oList)
-print("Separators: ", sList)
-print("Comments: ", cList)
-print("\nTOTAL TOKENS")
-print(kCount + iCount + lCount + oCount + sCount + cCount)
+    def handle_separators(self, char):
+        if self.literalLocked == False and self.commentLocked == False:     
+            if char in string.punctuation and char != '"' and char != "'" and char not in operators:
+                self.sCount += 1
+                if char not in self.sList:
+                    self.sList.append(char)
+
+    def handle_keywords_identifiers(self, char, i, line):
+        if self.literalLocked == False and self.commentLocked == False:     
+            # Check if there is a keyword or identifier before the punct for a function call
+            koriString = ''
+            if not char.isalpha() and not char == '_' and not char.isdigit():
+                self.nextpunctIndex = i
+                for c in line[self.prevspaceIndex:self.nextpunctIndex]:
+                    koriString = koriString + c
+                self.prevspaceIndex = self.nextpunctIndex + 1
+            elif char == ' ':
+                self.nextspaceIndex = i
+                for c in line[self.prevspaceIndex:self.nextspaceIndex]:
+                    koriString = koriString + c
+                self.prevspaceIndex = self.nextspaceIndex + 1
+                # Check for repeated spaces and remove them
+                if line[i - 1] == ' ':
+                    self.removeSpace = True
+            if keyword.iskeyword(koriString) or koriString == 'print':
+                self.kCount += 1
+                if koriString not in self.kList:
+                    self.kList.append(koriString)
+            elif koriString.isidentifier():
+                self.iCount += 1
+                if koriString not in self.iList:
+                    self.iList.append(koriString)
+
+    def handle_literals(self, char, i, line):
+        if self.commentLocked == False:
+            # Check for string literal
+            if (char == "'" or char == '"'):
+                if (char == "'" and line[i + 1] == "'" and line[i + 2] == "'") or (char == '"' and line[i + 1] == '"' and line[i + 2] == '"') or (self.firstQuoteChar == 'i'):
+                    # Lock us in a literal, log the first quote character, and increment the literal count
+                    self.prevquoteIndex = i
+                    self.literalLocked = True
+                    self.firstQuoteChar = char
+                    self.lCount += 1
+                elif (self.firstQuoteChar == char):
+                    # Unlock us from the literal and store the string literal
+                    if (char == "'" and line[i + 1] == "'" and line[i + 2] == "'") or (char == '"' and line[i + 1] == '"' and line[i + 2] == '"'):
+                        self.nextquoteIndex = i + 2
+                    else:
+                        self.nextquoteIndex = i
+                    stringLiteral = ''
+                    for c in line[self.prevquoteIndex:self.nextquoteIndex + 1]:
+                        stringLiteral = stringLiteral + c
+                    if stringLiteral not in self.lList:
+                        self.lList.append(stringLiteral)
+                    self.literalLocked = False
+                    self.firstQuoteChar = 'i'
+            # Check if character is a number
+            if (char.isdigit()):
+                self.lCount += 1
+                if char not in self.lList:
+                    self.lList.append(char)
+
+    def remove_excess(self, char, i):
+        # Check if we have reached a valid character to be printed
+        if not self.charReached and (char != ' ' and char != '\n' and char != '#') and not self.commentLockedFirstChar:
+            self.charReached = True
+        # Add character to final output string
+        if self.charReached and not (i == 0 and char == '\n') and not self.removeSpace:
+            self.excessRemoved = self.excessRemoved + char
+
+    def format_results(self):
+        # Format the results
+        results = (
+        f"{self.excessRemoved}\n"
+        "\nCOUNTS\n"
+        f"Keywords: {self.kCount}\n"
+        f"Identifiers: {self.iCount}\n"
+        f"Literals: {self.lCount}\n"
+        f"Operators: {self.oCount}\n"
+        f"Separators: {self.sCount}\n"
+        f"Comments: {self.cCount}\n"
+        "\nLISTS\n"
+        f"Keywords: {self.kList}\n"
+        f"Identifiers: {self.iList}\n"
+        f"Literals: {self.lList}\n"
+        f"Operators: {self.oList}\n"
+        f"Separators: {self.sList}\n"
+        f"Comments: {self.cList}\n"
+        "\nTOTAL TOKENS\n"
+        f"{self.kCount + self.iCount + self.lCount + self.oCount + self.sCount + self.cCount}"
+        )
+        return results
+    
+    def print_results(self):
+        # Print the formatted results of the tokenization
+        print(self.format_results())
+
+
+if __name__ == "__main__":
+    parser = CodeParser("test.py")
+    parser.parse_file()
