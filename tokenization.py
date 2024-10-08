@@ -29,10 +29,7 @@ class CodeParser:
         # Open the file and read the lines
         with open(self.filepath, "r") as file:
             for line in file:
-                self.prevspaceIndex = 0
-                self.nextspaceIndex = 0
-                self.charReached = False
-                self.commentLockedFirstChar = False
+                self.reset()
                 self.parse_line(line)
         self.print_results()
     
@@ -47,6 +44,12 @@ class CodeParser:
             self.handle_literals(char, i, line)
             self.remove_excess(char, i)
     
+    def reset(self):
+        # Reset the variables for each line
+        self.literalLocked, self.commentLocked, self.commentLockedFirstChar, self.charReached, self.removeSpace = False, False, False, False, False
+        self.firstQuoteChar, self.firstCommentChar = 'i', 'i'
+        self.prevspaceIndex, self.firstCommentCharIndex, self.nextspaceIndex, self.prevquoteIndex, self.nextquoteIndex, self.nextpunctIndex = 0, 0, 0, 0, 0, 0
+
     def handle_comments(self, char, i, line):
         if self.literalLocked == False and self.commentLocked == False:    
             if char == '#' and self.firstCommentChar == 'i':
@@ -59,16 +62,12 @@ class CodeParser:
                 self.cCount += 1
         elif self.literalLocked == False and self.commentLocked == True:
             if char == '\n':
-                # Begin resetting the variables for the next line
                 tempcString = ''
                 for c in line[self.firstCommentCharIndex:i]:
                     tempcString = tempcString + c
                 if tempcString not in self.cList:
                     self.cList.append(tempcString)
-                self.commentLocked = False
-                self.firstCommentChar = 'i'
-                self.prevspaceIndex = 0
-    
+
     def handle_operators(self, char):
         if self.literalLocked == False and self.commentLocked == False:     
             if (char in operators):
@@ -140,11 +139,12 @@ class CodeParser:
 
     def remove_excess(self, char, i):
         # Check if we have reached a valid character to be printed
-        if not self.charReached and (char != ' ' and char != '\n' and char != '#') and not self.commentLockedFirstChar:
-            self.charReached = True
         # Add character to final output string
         if self.charReached and not (i == 0 and char == '\n') and not self.removeSpace:
             self.excessRemoved = self.excessRemoved + char
+        elif not self.charReached and (char != ' ' and char != '\n' and char != '#') and not self.commentLockedFirstChar:
+            self.charReached = True
+            self.remove_excess(char, i)
 
     def format_results(self):
         # Format the results

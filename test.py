@@ -1,11 +1,11 @@
-# This is a sample code
-# It adds two numbers
-
-def add(a, b):
-    # Add two numbers
-    result = a +  b
-    
-    return result
-
-# Test the function
-print(add(5,3))
+def calculate_sum(a, b):
+# This function calculates the sum of two numbers
+return a + b
+# Main function
+if __name__ == "__main__":
+num1 = 10
+num2 = 20
+# Calculate the sum
+result = calculate_sum(num1, num2)
+# Print the result
+print("Sum:", result)
