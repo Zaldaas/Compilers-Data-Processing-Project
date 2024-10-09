@@ -58,9 +58,15 @@ class CodeParser:
     
     def reset(self):
         # Reset the variables for each line
-        self.literalLocked, self.commentLocked, self.charReached = False, False, False
+        self.literalLocked, self.commentLocked, self.charReached = (
+            False, False, False
+        )
         self.firstQuoteChar, self.firstCommentChar = 'i', 'i'
-        self.prevspaceIndex, self.firstCommentCharIndex, self.firstDocstringCharIndex, self.nextspaceIndex, self.prevquoteIndex, self.nextquoteIndex, self.nextpunctIndex = 0, 0, 0, 0, 0, 0, 0
+        (
+            self.prevspaceIndex, self.firstCommentCharIndex, self.firstDocstringCharIndex, 
+            self.nextspaceIndex, self.prevquoteIndex, self.nextquoteIndex, 
+            self.nextpunctIndex 
+        ) = (0, 0, 0, 0, 0, 0, 0)
 
     def handle_comments(self, char, i, line):
         # Check if we are still on the tail end of a docstring
