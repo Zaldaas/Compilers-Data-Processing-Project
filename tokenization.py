@@ -126,16 +126,24 @@ class CodeParser:
         if not self.literalLocked and not self.commentLocked and not self.docstringLocked:
             if char in operators and self.doubleOperator == 0:
                 self.oCount += 1
-                if char not in self.oList:
-                    self.oList.append(char)
                 if (line[i + 1] in operators):
                     self.doubleOperator = 2
+                if char not in self.oList and self.doubleOperator == 0:
+                    self.oList.append(char)
+            elif char == '!' and self.doubleOperator == 0 and line[i + 1] == '=':
+                self.oCount += 1
+                self.doubleOperator = 2
+            elif char in operators and self.doubleOperator == 1:
+                doubleOperatorString = line[i - 1] + char
+                if char not in self.oList:
+                    self.oList.append(doubleOperatorString)
+
 
     def handle_separators(self, char):
         if not self.literalLocked and not self.commentLocked and not self.docstringLocked:
             if (
                 char in string.punctuation and char != '"' and char != "'" and
-                char != '_' and char not in operators
+                char != '_' and char not in operators and self.doubleOperator == 0
             ):
                 self.sCount += 1
                 if char not in self.sList:
