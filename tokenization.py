@@ -16,14 +16,14 @@ class CodeParser:
         # Initialize the class with the filepath and counters for tokens
         self.kCount, self.iCount, self.lCount, self.oCount, self.sCount, self.cCount = 0, 0, 0, 0, 0, 0
         self.kList, self.iList, self.lList, self.oList, self.sList, self.cList = [], [], [], [], [], []
-        # Final output string
-        self.excessRemoved = ''
+        # Final output string and docstring string
+        self.excessRemoved, self.docstring = '', ''
         # Literal/Comment lock, first char comment, valid char reached, repeated space detected
-        self.literalLocked, self.commentLocked, self.commentLockedFirstChar, self.charReached, self.removeSpace = False, False, False, False, False
+        self.literalLocked, self.commentLocked, self.docstringLocked, self.commentLockedFirstChar, self.charReached, self.removeSpace = False, False, False, False, False, False
         # Initializing first quote character and first comment character to 'i' to indicate that we are not locked in a literal or comment
         self.firstQuoteChar, self.firstCommentChar = 'i', 'i'
         # Index trackers
-        self.prevspaceIndex, self.firstCommentCharIndex, self.nextspaceIndex, self.prevquoteIndex, self.nextquoteIndex, self.nextpunctIndex = 0, 0, 0, 0, 0, 0
+        self.prevspaceIndex, self.firstCommentCharIndex, self.firstDocstringCharIndex, self.nextspaceIndex, self.prevquoteIndex, self.nextquoteIndex, self.nextpunctIndex = 0, 0, 0, 0, 0, 0, 0
 
     def parse_file(self):
         # Open the file and read the lines
@@ -48,10 +48,10 @@ class CodeParser:
         # Reset the variables for each line
         self.literalLocked, self.commentLocked, self.commentLockedFirstChar, self.charReached, self.removeSpace = False, False, False, False, False
         self.firstQuoteChar, self.firstCommentChar = 'i', 'i'
-        self.prevspaceIndex, self.firstCommentCharIndex, self.nextspaceIndex, self.prevquoteIndex, self.nextquoteIndex, self.nextpunctIndex = 0, 0, 0, 0, 0, 0
+        self.prevspaceIndex, self.firstCommentCharIndex, self.firstDocstringCharIndex, self.nextspaceIndex, self.prevquoteIndex, self.nextquoteIndex, self.nextpunctIndex = 0, 0, 0, 0, 0, 0, 0
 
     def handle_comments(self, char, i, line):
-        if self.literalLocked == False and self.commentLocked == False:    
+        if self.literalLocked == False and self.commentLocked == False and self.docstringLocked == False:    
             if char == '#' and self.firstCommentChar == 'i':
                 self.commentLocked = True
                 # If comment is the first character of the line, we will not output the newline. <- This logic is seen later
@@ -60,30 +60,48 @@ class CodeParser:
                 self.firstCommentChar = char
                 self.firstCommentCharIndex = i
                 self.cCount += 1
-        elif self.literalLocked == False and self.commentLocked == True:
+            elif (char == "'" and line[i - 1] == "'" and line[i - 2] == "'") or (char == '"' and line[i - 1] == '"' and line[i - 2] == '"'):
+                self.docstringLocked = True
+                self.firstDocstringCharIndex = i
+                self.docstring = self.docstring + line[i - 2] + line[i - 1]
+                self.cCount += 1
+        elif self.literalLocked == False and self.commentLocked == True and self.docstringLocked == False:
             if char == '\n':
                 tempcString = ''
                 for c in line[self.firstCommentCharIndex:i]:
                     tempcString = tempcString + c
                 if tempcString not in self.cList:
                     self.cList.append(tempcString)
+        elif self.literalLocked == False and self.commentLocked == False and self.docstringLocked == True:
+            if char == '\n':
+                if self.firstDocstringCharIndex != 0:
+                    for c in line[self.firstDocstringCharIndex:i]:
+                        self.docstring = self.docstring + c
+                else:
+                    for c in line[0:i]:
+                        self.docstring = self.docstring + c
+            elif (char == "'" and line[i + 1] == "'" and line[i + 2] == "'") or (char == '"' and line[i + 1] == '"' and line[i + 2] == '"'):
+                self.docstring = self.docstring + line[i + 1] + line[i + 2]
+                if self.docstring not in self.cList:
+                    self.cList.append(self.docstring)
+                self.docstringLocked = False
 
     def handle_operators(self, char):
-        if self.literalLocked == False and self.commentLocked == False:     
+        if self.literalLocked == False and self.commentLocked == False and self.docstringLocked == False:     
             if (char in operators):
                 self.oCount += 1
                 if char not in self.oList:
                     self.oList.append(char)
 
     def handle_separators(self, char):
-        if self.literalLocked == False and self.commentLocked == False:     
+        if self.literalLocked == False and self.commentLocked == False and self.docstringLocked == False:     
             if char in string.punctuation and char != '"' and char != "'" and char not in operators:
                 self.sCount += 1
                 if char not in self.sList:
                     self.sList.append(char)
 
     def handle_keywords_identifiers(self, char, i, line):
-        if self.literalLocked == False and self.commentLocked == False:     
+        if self.literalLocked == False and self.commentLocked == False and self.docstringLocked == False:     
             # Check if there is a keyword or identifier before the punct for a function call
             koriString = ''
             if not char.isalpha() and not char == '_' and not char.isdigit():
@@ -109,10 +127,10 @@ class CodeParser:
                     self.iList.append(koriString)
 
     def handle_literals(self, char, i, line):
-        if self.commentLocked == False:
-            # Check for string literal
-            if (char == "'" or char == '"'):
-                if (char == "'" and line[i + 1] == "'" and line[i + 2] == "'") or (char == '"' and line[i + 1] == '"' and line[i + 2] == '"') or (self.firstQuoteChar == 'i'):
+        if self.commentLocked == False and self.docstringLocked == False:
+            # Check for string literal and not docstring
+            if (char == "'" or char == '"') and not (((char == "'" and line[i + 1] == "'" and line[i + 2] == "'") or (char == '"' and line[i + 1] == '"' and line[i + 2] == '"')) or ((char == "'" and line[i - 1] == "'" and line[i + 1] == "'") or (char == '"' and line[i - 1] == '"' and line[i + 1] == '"')) or ((char == "'" and line[i - 1] == "'" and line[i - 2] == "'") or (char == '"' and line[i - 1] == '"' and line[i - 2] == '"'))):
+                if (self.firstQuoteChar == 'i'):
                     # Lock us in a literal, log the first quote character, and increment the literal count
                     self.prevquoteIndex = i
                     self.literalLocked = True
@@ -120,10 +138,7 @@ class CodeParser:
                     self.lCount += 1
                 elif (self.firstQuoteChar == char):
                     # Unlock us from the literal and store the string literal
-                    if (char == "'" and line[i + 1] == "'" and line[i + 2] == "'") or (char == '"' and line[i + 1] == '"' and line[i + 2] == '"'):
-                        self.nextquoteIndex = i + 2
-                    else:
-                        self.nextquoteIndex = i
+                    self.nextquoteIndex = i
                     stringLiteral = ''
                     for c in line[self.prevquoteIndex:self.nextquoteIndex + 1]:
                         stringLiteral = stringLiteral + c
