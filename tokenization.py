@@ -19,11 +19,11 @@ class CodeParser:
         # Final output string and docstring string
         self.excessRemoved, self.docstring = '', ''
         # Literal/Comment lock, first char comment, valid char reached, repeated space detected
-        self.literalLocked, self.commentLocked, self.docstringLocked, self.commentLockedFirstChar, self.charReached, self.removeSpace = False, False, False, False, False, False
+        self.literalLocked, self.commentLocked, self.docstringLocked, self.charReached, self.removeSpace = False, False, False, False, False
         # Initializing first quote character and first comment character to 'i' to indicate that we are not locked in a literal or comment
         self.firstQuoteChar, self.firstCommentChar = 'i', 'i'
         # Index trackers
-        self.prevspaceIndex, self.firstCommentCharIndex, self.firstDocstringCharIndex, self.nextspaceIndex, self.prevquoteIndex, self.nextquoteIndex, self.nextpunctIndex = 0, 0, 0, 0, 0, 0, 0
+        self.prevspaceIndex, self.firstCommentCharIndex, self.firstDocstringCharIndex, self.exitingDocstring, self.enteringDocstring, self.nextspaceIndex, self.prevquoteIndex, self.nextquoteIndex, self.nextpunctIndex = 0, 0, 0, 0, 0, 0, 0, 0, 0
 
     def parse_file(self):
         # Open the file and read the lines
@@ -46,25 +46,34 @@ class CodeParser:
     
     def reset(self):
         # Reset the variables for each line
-        self.literalLocked, self.commentLocked, self.commentLockedFirstChar, self.charReached, self.removeSpace = False, False, False, False, False
+        self.literalLocked, self.commentLocked, self.charReached = False, False, False
         self.firstQuoteChar, self.firstCommentChar = 'i', 'i'
         self.prevspaceIndex, self.firstCommentCharIndex, self.firstDocstringCharIndex, self.nextspaceIndex, self.prevquoteIndex, self.nextquoteIndex, self.nextpunctIndex = 0, 0, 0, 0, 0, 0, 0
 
     def handle_comments(self, char, i, line):
+        # Check if we are still on the tail end of a docstring
+        if self.exitingDocstring > 0:
+            self.exitingDocstring -= 1
+            if self.exitingDocstring == 0:
+                self.docstringLocked = False
+        if self.enteringDocstring > 0:
+            self.enteringDocstring -= 1
         if self.literalLocked == False and self.commentLocked == False and self.docstringLocked == False:    
+            # Regular # comment handling
             if char == '#' and self.firstCommentChar == 'i':
                 self.commentLocked = True
-                # If comment is the first character of the line, we will not output the newline. <- This logic is seen later
-                if i == 0:
-                    self.commentLockedFirstChar = True
                 self.firstCommentChar = char
                 self.firstCommentCharIndex = i
                 self.cCount += 1
-            elif (char == "'" and line[i - 1] == "'" and line[i - 2] == "'") or (char == '"' and line[i - 1] == '"' and line[i - 2] == '"'):
+            # Docstring handling
+            elif ((char == "'" and line[i - 1] == "'" and line[i - 2] == "'") or (char == '"' and line[i - 1] == '"' and line[i - 2] == '"') and self.exitingDocstring == 0):
                 self.docstringLocked = True
-                self.firstDocstringCharIndex = i
-                self.docstring = self.docstring + line[i - 2] + line[i - 1]
+                self.firstDocstringCharIndex = i - 2
                 self.cCount += 1
+            # Docstring peak check
+            if (char == "'" and line[i + 1] == "'" and line[i + 2] == "'") or (char == '"' and line[i + 1] == '"' and line[i + 2] == '"'):
+                self.enteringDocstring = 3
+        # Regular # comment handling
         elif self.literalLocked == False and self.commentLocked == True and self.docstringLocked == False:
             if char == '\n':
                 tempcString = ''
@@ -72,19 +81,17 @@ class CodeParser:
                     tempcString = tempcString + c
                 if tempcString not in self.cList:
                     self.cList.append(tempcString)
+                self.commentLocked = False
+        # Docstring handling
         elif self.literalLocked == False and self.commentLocked == False and self.docstringLocked == True:
             if char == '\n':
-                if self.firstDocstringCharIndex != 0:
-                    for c in line[self.firstDocstringCharIndex:i]:
-                        self.docstring = self.docstring + c
-                else:
-                    for c in line[0:i]:
-                        self.docstring = self.docstring + c
+                for c in line[self.firstDocstringCharIndex:i]:
+                    self.docstring = self.docstring + c
             elif (char == "'" and line[i + 1] == "'" and line[i + 2] == "'") or (char == '"' and line[i + 1] == '"' and line[i + 2] == '"'):
-                self.docstring = self.docstring + line[i + 1] + line[i + 2]
+                self.docstring = self.docstring + char + line[i + 1] + line[i + 2]
                 if self.docstring not in self.cList:
                     self.cList.append(self.docstring)
-                self.docstringLocked = False
+                self.exitingDocstring = 3
 
     def handle_operators(self, char):
         if self.literalLocked == False and self.commentLocked == False and self.docstringLocked == False:     
@@ -104,7 +111,7 @@ class CodeParser:
         if self.literalLocked == False and self.commentLocked == False and self.docstringLocked == False:     
             # Check if there is a keyword or identifier before the punct for a function call
             koriString = ''
-            if not char.isalpha() and not char == '_' and not char.isdigit():
+            if not char.isalpha() and not char == '_' and not char == ' ' and not char.isdigit():
                 self.nextpunctIndex = i
                 for c in line[self.prevspaceIndex:self.nextpunctIndex]:
                     koriString = koriString + c
@@ -155,9 +162,9 @@ class CodeParser:
     def remove_excess(self, char, i):
         # Check if we have reached a valid character to be printed
         # Add character to final output string
-        if self.charReached and not (i == 0 and char == '\n') and not self.removeSpace:
+        if self.charReached and (self.exitingDocstring == 0 and self.enteringDocstring == 0) and not (self.removeSpace or self.commentLocked or self.docstringLocked):
             self.excessRemoved = self.excessRemoved + char
-        elif not self.charReached and (char != ' ' and char != '\n' and char != '#') and not self.commentLockedFirstChar:
+        elif not self.charReached and (char != ' ' and char != '\n' and char != '#') and not (self.commentLocked or self.docstringLocked):
             self.charReached = True
             self.remove_excess(char, i)
 
@@ -180,7 +187,7 @@ class CodeParser:
         f"Separators: {self.sList}\n"
         f"Comments: {self.cList}\n"
         "\nTOTAL TOKENS\n"
-        f"{self.kCount + self.iCount + self.lCount + self.oCount + self.sCount + self.cCount}"
+        f"{self.kCount + self.iCount + self.lCount + self.oCount + self.sCount}"
         )
         return results
     
