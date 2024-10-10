@@ -53,7 +53,7 @@ class CodeParser:
             self.handle_operators(char, i, line)
             self.handle_separators(char)
             self.handle_keywords_identifiers_numbers(char, i, line)
-            self.handle_strings_docstrings(char, i, line)
+            self.handle_strings(char, i, line)
             self.remove_excess(char, i)
     
     def reset(self):
@@ -184,7 +184,7 @@ class CodeParser:
                 if koriString not in self.lList:
                     self.lList.append(koriString)
 
-    def handle_strings_docstrings(self, char, i, line):
+    def handle_strings(self, char, i, line):
         if not self.commentLocked and not self.docstringLocked:
             # Check for string literal and not docstring
             if (
