@@ -9,4 +9,4 @@ if __name__ == "__main__":
     # Calculate the sum
     result = calculate_sum(num1, num2)
     # Print the result
-    print("Sum:", result)
+    print(f"Sum:", result)

@@ -22,12 +22,12 @@ class CodeParser:
         )
         # Final output string and docstring string
         self.excessRemoved, self.docstring = '', ''
-        # Literal/Comment lock, first char comment, valid char reached, repeated space detected
-        self.literalLocked, self.commentLocked, self.docstringLocked = (
-            False, False, False
+        # Literal/fString/Comment/Docstring lock, first char comment, valid char reached, repeated space detected
+        self.literalLocked, self.commentLocked, self.docstringLocked, self.fString = (
+            False, False, False, False
         )
         self.charReached, self.removeSpace = False, False
-        # Initializing first quote character and first comment character to 'i' to indicate that we are not locked in a literal or comment
+        # Initializing first quote character and first comment character to 'i' to indicate that we are not locked in a literal/comment
         self.firstQuoteChar, self.firstCommentChar = 'i', 'i'
         # Index trackers and nearby character loggers
         (
@@ -58,8 +58,8 @@ class CodeParser:
     
     def reset(self):
         # Reset the variables for each line
-        self.literalLocked, self.commentLocked, self.charReached = (
-            False, False, False
+        self.literalLocked, self.commentLocked, self.charReached, self.fString = (
+            False, False, False, False
         )
         self.firstQuoteChar, self.firstCommentChar = 'i', 'i'
         (
@@ -155,9 +155,13 @@ class CodeParser:
             koriString = ''
             if not char.isalpha() and not char == '_' and not char == ' ' and not char.isdigit():
                 self.nextpunctIndex = i
-                for c in line[self.prevspaceIndex:self.nextpunctIndex]:
-                    koriString += c
-                self.prevspaceIndex = self.nextpunctIndex + 1
+                # Check for fString
+                if char == '"' or char == "'" and (line[i - 1] == 'f' or line[i - 1] == 'F'):
+                    return
+                else:
+                    for c in line[self.prevspaceIndex:self.nextpunctIndex]:
+                        koriString += c
+                    self.prevspaceIndex = self.nextpunctIndex + 1
             elif char == ' ':
                 self.nextspaceIndex = i
                 for c in line[self.prevspaceIndex:self.nextspaceIndex]:
@@ -203,14 +207,22 @@ class CodeParser:
                     self.literalLocked = True
                     self.firstQuoteChar = char
                     self.lCount += 1
+                    if line[i - 1] == 'f' or line[i - 1] == 'F':
+                        self.fString = True
                 elif (self.firstQuoteChar == char):
                     # Unlock us from the literal and store the string literal
                     self.nextquoteIndex = i
                     stringLiteral = ''
-                    for c in line[self.prevquoteIndex:self.nextquoteIndex + 1]:
-                        stringLiteral += c
+                    if not self.fString:
+                        for c in line[self.prevquoteIndex:self.nextquoteIndex + 1]:
+                            stringLiteral += c
+                    else:
+                        for c in line[self.prevquoteIndex - 1:self.nextquoteIndex + 1]:
+                            stringLiteral += c
                     if stringLiteral not in self.lList:
                         self.lList.append(stringLiteral)
+                    if self.fString:
+                        self.fString = False
                     self.literalLocked = False
                     self.firstQuoteChar = 'i'
 
