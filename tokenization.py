@@ -2,6 +2,15 @@
 import keyword
 import string
 
+hasTabulate = True
+
+try:
+    # Check if tabulate is installed
+    from tabulate import tabulate
+except ImportError:
+    # If tabulate is not installed, install it
+    hasTabulate = False
+
 # Store a list of python operators
 operators = [
     "+", "-", "*", "/", "%", "**", "//",   # Arithmetic Operators
@@ -258,15 +267,33 @@ class CodeParser:
         f"Separators: {self.sList}\n"
         f"Comments: {self.cList}\n"
         "\nTOTAL TOKENS\n"
-        f"{self.kCount + self.iCount + self.lCount + self.oCount + self.sCount}"
+        f"{self.kCount + self.iCount + self.lCount + self.oCount + self.sCount}\n"
         )
         return results
     
     def print_results(self):
         # Print the formatted results of the tokenization
-        print(self.format_results())
+        if hasTabulate:
+            data = [
+                ["Keywords", self.kList, self.kCount],
+                ["Identifiers", self.iList, self.iCount],
+                ["Literals", self.lList, self.lCount],
+                ["Operators", self.oList, self.oCount],
+                ["Separators", self.sList, self.sCount],
+                ["Comments", self.cList, self.cCount],
+                ["Total", "", self.kCount + self.iCount + self.lCount + self.oCount + self.sCount]
+            ]
+            print(f"{self.filepath.upper()}")
+            print(f"CLEANED UP CODE\n{self.excessRemoved}")
+            print(tabulate(data, headers=["Category", "Tokens", "Counts"], tablefmt="grid"))
+        else:
+            print(self.format_results())
 
 
 if __name__ == "__main__":
-    parser = CodeParser("test.py")
-    parser.parse_file()
+    files = [
+        "testtokenization1.py", "testtokenization2.py", "testtokenization3.py", "testtokenization4.py"
+    ]
+    for file in files:
+        parser = CodeParser(file)
+        parser.parse_file()
