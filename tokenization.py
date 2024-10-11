@@ -251,6 +251,8 @@ class CodeParser:
     def format_results(self):
         # Format the results
         results = (
+        f"{self.filepath.upper()}\n"
+        "CLEANED UP CODE\n"
         f"{self.excessRemoved}\n"
         "\nCOUNTS\n"
         f"Keywords: {self.kCount}\n"
